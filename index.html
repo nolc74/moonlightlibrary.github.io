@@ -15,4 +15,61 @@ function toggleFav(id){favorites=favorites.includes(id)?favorites.filter(x=>x!==
 function showLibrary(){document.getElementById('library').innerHTML='<button class="chip back" onclick="home()">← 책장</button><h2 class="section">내 서재</h2><div class="grid">'+data.novels.filter(n=>favorites.includes(n.id)).map(n=>'<article class="book" onclick="showNovel('+n.id+')"><div class="cover">'+n.t+'</div><div><h3>'+n.t+'</h3><div class="meta">'+n.a+' · '+n.g+'</div></div></article>').join('')+'</div>'+(favorites.length?'':'<p class="empty">아직 담은 작품이 없습니다.</p>');view('library')}
 function toggleTheme(){document.documentElement.classList.toggle('dark');localStorage.setItem('moon-dark',document.documentElement.classList.contains('dark'))}
 if(localStorage.getItem('moon-dark')==='true')document.documentElement.classList.add('dark');renderBooks();
-</script></body></html>
+</script>
+<style>
+.admin-wrap{max-width:940px;margin:28px auto;padding:0 20px}.admin-card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:18px;margin:14px 0}.admin-card h2,.admin-card h3{font-family:'Noto Serif KR';margin:0 0 14px}.admin-card label{display:block;color:var(--muted);font-size:14px;margin:10px 0 5px}.admin-card input,.admin-card textarea,.admin-card select{width:100%;padding:11px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--ink);font:inherit}.admin-card textarea{min-height:180px;resize:vertical}.admin-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}.coin-page{text-align:center;padding:65px 15px}.coin-number{font:900 76px 'Noto Serif KR';color:var(--gold);margin:20px}.admin-list{border-top:1px solid var(--line);padding:12px 0;display:flex;justify-content:space-between;gap:10px;align-items:center}.small-btn{padding:6px 10px;border-radius:20px;border:1px solid var(--line);background:transparent;color:inherit;cursor:pointer}@media(max-width:600px){.admin-grid{grid-template-columns:1fr}}
+</style>
+<script>
+(()=> {
+const OWNER='nolc74', REPO='moonlightlibrary.github.io', BRANCH='main';
+let adminToken=sessionStorage.getItem('moon-admin-token')||'', dataSha='';
+const $=s=>document.querySelector(s);
+const enc=s=>btoa(unescape(encodeURIComponent(s)));
+const api=(path,opts={})=>fetch('https://api.github.com'+path,{...opts,headers:{Accept:'application/vnd.github+json',Authorization:'Bearer '+adminToken,'X-GitHub-Api-Version':'2022-11-28',...(opts.headers||{})}});
+function ensureViews(){
+ const h=document.querySelector('header');
+ const b=document.createElement('button');b.className='chip';b.textContent=adminToken?'관리자 메뉴':'관리자 로그인';b.id='adminEntry';b.onclick=adminEntry;h.appendChild(b);
+ const c=document.createElement('button');c.className='chip';c.textContent='코인 얻기 · '+coins();c.id='coinEntry';c.onclick=showCoins;h.appendChild(c);
+ const m=document.querySelector('main');
+ const a=document.createElement('section');a.id='adminView';a.className='view';a.innerHTML=adminHTML();m.appendChild(a);
+ const v=document.createElement('section');v.id='coinsView';v.className='view';v.innerHTML='<div class="coin-page"><h2 class="section">코인 얻기</h2><p>버튼을 누를 때마다 1코인을 받습니다.</p><div class="coin-number" id="coinCount">'+coins()+'</div><button class="btn" id="coinPlus">코인 받기 +1</button></div>';m.appendChild(v);
+}
+function coins(){return Math.max(0,Number(localStorage.getItem('moon-coins')||200))}
+function showCoins(){view('coinsView');$('#coinCount').textContent=coins();$('#coinEntry').textContent='코인 얻기 · '+coins()}
+function adminHTML(){return '<div class="admin-wrap"><h2 class="section">관리자 페이지</h2><p class="meta">관리자 인증이 완료된 브라우저에서만 작품과 회차를 등록할 수 있습니다.</p><div class="admin-card"><h3>새 작품 만들기</h3><div class="admin-grid"><div><label>제목</label><input id="newTitle" placeholder="작품 제목"></div><div><label>작가명</label><input id="newAuthor" placeholder="작가명"></div><div><label>장르</label><input id="newGenre" placeholder="예: 판타지"></div><div><label>상태</label><select id="newStatus"><option>연재중</option><option>완결</option><option>휴재</option></select></div></div><label>표지 색</label><input id="newColor" type="color" value="#2f3f8f"><label>소개</label><textarea id="newDesc"></textarea><button class="btn" id="createNovel">작품 만들기</button></div><div class="admin-card"><h3>새 회차 올리기</h3><label>작품</label><select id="episodeNovel"></select><label>회차 제목</label><input id="episodeTitle" placeholder="회차 제목"><label>본문 (줄바꿈은 문단 구분)</label><textarea id="episodeBody"></textarea><label><input id="episodeSchedule" type="checkbox" style="width:auto"> 예약 업로드</label><label>공개 시각</label><input id="episodeDate" type="datetime-local"><button class="btn" id="createEpisode">회차 올리기</button></div><div class="admin-card"><h3>작품·회차 관리</h3><div id="manageList"></div></div><p class="meta">GitHub 저장소에 저장됩니다. 관리자 인증에는 저장소 Contents 쓰기 권한이 있는 개인용 토큰이 필요합니다.</p><button class="chip" id="adminLogout">관리자 로그아웃</button></div>'}
+async function adminEntry(){
+ if(!adminToken){const t=prompt('GitHub 개인용 액세스 토큰을 입력하세요. 저장소 Contents 읽기/쓰기 권한이 필요합니다.');if(!t)return;adminToken=t;try{const r=await api('/repos/'+OWNER+'/'+REPO);if(!r.ok)throw Error('저장소 접근 권한을 확인하지 못했습니다. 토큰 권한을 확인하세요.');sessionStorage.setItem('moon-admin-token',t);$('#adminEntry').textContent='관리자 메뉴';}catch(e){adminToken='';alert(e.message);return}}
+ await loadRemoteData();renderAdmin();view('adminView');
+}
+async function loadRemoteData(){try{const r=await fetch('novels.json?'+Date.now());if(r.ok){const j=await r.json();if(j&&Array.isArray(j.novels)){data=j;renderBooks()}}}catch(e){}}
+async function saveRemote(){
+ const path='/repos/'+OWNER+'/'+REPO+'/contents/novels.json';
+ const body=JSON.stringify(data,null,2);
+ const get=await api(path);let sha;if(get.ok){const j=await get.json();sha=j.sha}
+ const payload={message:'달무리책방 작품 및 회차 업데이트',content:enc(body),branch:BRANCH,...(sha?{sha}:{})};
+ const r=await api(path,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
+ if(!r.ok){const j=await r.json().catch(()=>({}));throw Error(j.message||'GitHub 저장에 실패했습니다. 토큰 권한을 확인하세요.')}
+ await loadRemoteData();renderAdmin();alert('저장 완료! 사이트 데이터가 GitHub에 반영됐습니다. 배포 후 새로고침해 주세요.');
+}
+function renderAdmin(){
+ const s=$('#episodeNovel');if(!s)return;s.innerHTML=data.novels.map(n=>'<option value="'+n.id+'">'+esc(n.t)+'</option>').join('');
+ $('#manageList').innerHTML=data.novels.map(n=>'<div class="admin-list"><b>'+esc(n.t)+'</b><span>'+n.e.length+'화 <button class="small-btn" data-delnovel="'+n.id+'">작품 삭제</button></span></div>'+n.e.map((e,i)=>'<div class="admin-list" style="padding-left:18px"><span>'+(i+1)+'화 · '+esc(e.t)+'</span><button class="small-btn" data-delepisode="'+n.id+':'+i+'">회차 삭제</button></div>').join('')).join('')||'등록된 작품이 없습니다.';
+}
+function esc(s){return String(s||'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
+document.addEventListener('click',async e=>{
+ if(e.target.id==='coinPlus'){const n=coins()+1;localStorage.setItem('moon-coins',n);$('#coinCount').textContent=n;$('#coinEntry').textContent='코인 얻기 · '+n}
+ if(e.target.id==='createNovel'){const t=$('#newTitle').value.trim();if(!t){alert('작품 제목을 입력하세요.');return}data.novels.push({id:Math.max(0,...data.novels.map(n=>Number(n.id)||0))+1,t,a:$('#newAuthor').value.trim()||'작가',g:$('#newGenre').value.trim()||'기타',s:$('#newStatus').value,c:$('#newColor').value,d:$('#newDesc').value.trim(),e:[]});try{await saveRemote()}catch(x){alert(x.message)}}
+ if(e.target.id==='createEpisode'){const n=data.novels.find(x=>String(x.id)===$('#episodeNovel').value),t=$('#episodeTitle').value.trim(),body=$('#episodeBody').value;if(!n||!t||!body.trim()){alert('작품, 회차 제목, 본문을 모두 입력하세요.');return}const scheduled=$('#episodeSchedule').checked;const date=$('#episodeDate').value;n.e.push({t,x:body.split(/\n\s*\n/),...(scheduled&&date?{publishAt:new Date(date).toISOString()}:{} )});try{await saveRemote()}catch(x){alert(x.message)}}
+ if(e.target.dataset.delnovel){if(confirm('이 작품과 모든 회차를 삭제할까요?')){data.novels=data.novels.filter(n=>String(n.id)!==e.target.dataset.delnovel);try{await saveRemote()}catch(x){alert(x.message)}}}
+ if(e.target.dataset.delepisode){const [id,i]=e.target.dataset.delepisode.split(':');const n=data.novels.find(x=>String(x.id)===id);if(n&&confirm('이 회차를 삭제할까요?')){n.e.splice(Number(i),1);try{await saveRemote()}catch(x){alert(x.message)}}}
+ if(e.target.id==='adminLogout'){sessionStorage.removeItem('moon-admin-token');adminToken='';$('#adminEntry').textContent='관리자 로그인';home()}
+});
+function renderAdmin(){const s=$('#episodeNovel');if(!s)return;s.innerHTML=data.novels.map(n=>'<option value="'+n.id+'">'+esc(n.t)+'</option>').join('');$('#manageList').innerHTML=data.novels.map(n=>'<div class="admin-list"><b>'+esc(n.t)+'</b><span>'+n.e.length+'화 <button class="small-btn" data-delnovel="'+n.id+'">작품 삭제</button></span></div>'+n.e.map((e,i)=>'<div class="admin-list" style="padding-left:18px"><span>'+(i+1)+'화 · '+esc(e.t)+'</span><button class="small-btn" data-delepisode="'+n.id+':'+i+'">회차 삭제</button></div>').join('')).join('')||'등록된 작품이 없습니다.'}
+ensureViews();
+$('#adminEntry').textContent=adminToken?'관리자 메뉴':'관리자 로그인';
+loadRemoteData();
+const oldShowNovel=window.showNovel;
+window.showNovel=function(id){const n=data.novels.find(x=>x.id===id);if(!n)return;oldShowNovel(id);const lis=$('#detail .episodes');if(lis){[...lis.querySelectorAll('li')].forEach((li,i)=>{const e=n.e[i];if(e&&e.publishAt&&Date.now()<new Date(e.publishAt).getTime())li.remove()})}}
+})();
+</script>
+</body></html>
