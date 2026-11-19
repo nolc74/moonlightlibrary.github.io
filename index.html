@@ -39,7 +39,23 @@ if(localStorage.getItem('moon-dark')==='true')document.documentElement.classList
  function hasPurchased(n,e,i){return purchasedEpisodes().includes(episodePurchaseKey(n,e,i))}
  function buyEpisode(id,i){const n=data.novels.find(x=>String(x.id)===String(id)),e=n?.e[i];if(!n||!e)return;const price=Math.max(0,Number(e.price)||0);if(price===0||hasPurchased(n,e,i)){readEpisode(id,i);return}if(coins()<price){alert('코인이 부족합니다. 필요한 코인: '+price+'개');return}if(!confirm(price+'코인을 사용해 이 회차를 구매할까요?'))return;localStorage.setItem('moon-coins',String(coins()-price));const list=purchasedEpisodes();list.push(episodePurchaseKey(n,e,i));localStorage.setItem('moon-purchases',JSON.stringify(list));$('#coinEntry').textContent='코인 얻기 · '+coins();readEpisode(id,i)}
  function adminHTML(){return '<div class="admin-wrap"><h2 class="section">관리자 페이지</h2><div class="admin-card"><h3>새 작품 만들기</h3><div class="admin-grid"><div><label>제목</label><input id="newTitle"></div><div><label>작가명</label><input id="newAuthor"></div><div><label>장르</label><input id="newGenre" placeholder="판타지"></div><div><label>상태</label><select id="newStatus"><option>연재중</option><option>완결</option><option>휴재</option></select></div></div><label>표지 색</label><input id="newColor" type="color" value="#2f3f8f"><label>소개</label><textarea id="newDesc"></textarea><button class="btn" id="createNovel">작품 만들기</button></div><div class="admin-card"><h3>새 회차 올리기</h3><label>작품</label><select id="episodeNovel"></select><label>회차 제목</label><input id="episodeTitle"><label>본문</label><textarea id="episodeBody"></textarea><label>회차 가격 (코인, 무료는 0)</label><input id="episodePrice" type="number" min="0" step="1" value="0"><label><input id="episodeSchedule" type="checkbox" style="width:auto"> 예약 공개</label><label>공개 시각</label><input id="episodeDate" type="datetime-local"><button class="btn" id="createEpisode">회차 저장</button> <button class="chip" id="cancelEpisodeEdit" style="display:none">수정 취소</button></div><div class="admin-card"><h3>작품 관리</h3><div id="manageList"></div></div><button class="chip" id="adminLogout">로그아웃</button></div>'}
- async function loadNovels(){const r=await fetch('/api/novels');if(r.ok){const j=await r.json();if(Array.isArray(j.novels))data.novels=j.novels;renderBooks()}}
+ async function loadNovels(){
+  let j=null;
+  try{
+   const r=await fetch('/api/novels',{cache:'no-store'});
+   if(r.ok){const v=await r.json();if(Array.isArray(v.novels))j=v}
+  }catch(e){}
+  if(!j){
+   const r=await fetch('/novels.json',{cache:'no-store'});
+   if(!r.ok)throw new Error('작품 목록을 불러오지 못했습니다.');
+   const v=await r.json();
+   if(!Array.isArray(v.novels))throw new Error('작품 데이터 형식이 올바르지 않습니다.');
+   j=v;
+  }
+  data.novels=j.novels;
+  renderBooks();
+  return true;
+ }
  async function login(){
   const password=prompt('관리자 비밀번호를 입력하세요.');if(!password)return;
   const r=await fetch('/api/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({password})});
