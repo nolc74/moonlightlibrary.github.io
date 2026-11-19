@@ -59,10 +59,15 @@ export async function onRequest({ request, env }) {
     return json({ ok: true }, 200, { "Set-Cookie": COOKIE + "=; Path=/; HttpOnly; Secure; SameSite=Strict; Max-Age=0" });
   }
   if (request.method === "GET" && url.pathname.endsWith("/novels")) {
-    const r = await fetch("https://raw.githubusercontent.com/" + OWNER + "/" + REPO + "/" + BRANCH + "/novels.json");
+    const r = await github("/repos/" + OWNER + "/" + REPO + "/contents/novels.json?ref=" + BRANCH, env);
     if (r.status === 404) return json({ novels: null });
     if (!r.ok) return json({ error: "작품 데이터를 불러오지 못했습니다." }, 502);
-    return new Response(await r.text(), { headers: { "content-type": "application/json; charset=utf-8", "cache-control": "no-store" } });
+    const file = await r.json();
+    if (!file.content) return json({ error: "작품 데이터가 비어 있습니다." }, 502);
+    const binary = atob(file.content.replace(/\\s/g, ""));
+    const bytes = Uint8Array.from(binary, ch => ch.charCodeAt(0));
+    const content = new TextDecoder().decode(bytes);
+    return new Response(content, { headers: { "content-type": "application/json; charset=utf-8", "cache-control": "no-store" } });
   }
   if (request.method === "PUT" && url.pathname.endsWith("/novels")) {
     if (!await validSession(request, env)) return json({ error: "관리자 로그인이 필요합니다." }, 401);
